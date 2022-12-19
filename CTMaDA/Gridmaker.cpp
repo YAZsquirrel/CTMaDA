@@ -285,13 +285,13 @@ bool Mesh::isInTriangle(knot& k1, knot& k2, knot& k3, knot& p)
 void Mesh::output()
 {
    std::ofstream of1("knots.txt");
-   of1 << knots.size() << ' ';
+   of1 << knots.size() << '\n';
    for (size_t i = 0; i < knots.size(); i++)
       of1 << knots[i].x << " " << knots[i].y << " " << knots[i].z << '\n';
    of1.close();
 
    std::ofstream of2("elements.txt");
-   of2 << elems.size() << ' ';
+   of2 << elems.size() << '\n';
    for (size_t i = 0; i < elems.size(); i++)
    {
       of2 << elems[i].n_mat << ' ';
@@ -302,19 +302,19 @@ void Mesh::output()
    of2.close();
 
    std::ofstream of3("bounds1.txt");
-   of3 << bounds1.size() << ' ';
+   of3 << bounds1.size() << '\n';
    for (auto& b : bounds1)
       of3 << b.knots_num[0] << " " << b.knots_num[1] << " " << b.value1 << '\n';
    of3.close();
 
    std::ofstream of4("bounds2.txt");
-   of4 << bounds2.size() << ' ';
+   of4 << bounds2.size() << '\n';
    for (auto& b : bounds2)
       of4 << b.knots_num[0] << " " << b.knots_num[1] << " " << b.value1 << '\n';
    of4.close();
 
    std::ofstream of5("bounds3.txt");
-   of5 << bounds3.size() << ' ';
+   of5 << bounds3.size() << '\n';
    for (auto& b : bounds3)
       of5 << b.knots_num[0] << " " << b.knots_num[1] << " " << b.value1 << " " << b.value2 << '\n';
    of5.close();
