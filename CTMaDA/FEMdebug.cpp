@@ -30,10 +30,10 @@ real FEM::bound2func(knot& k, int n_test)
    switch (n_test)
    {
 
-   case 10: return 1; // dy
-   case 11: return -1; // -dy
-   case 20: return 1; // dx
-   case 21: return -1; // -dx
+   case 10: return k.x; // dy
+   case 11: return -k.x; // -dy
+   case 20: return k.y; // dx
+   case 21: return -k.y; // -dx
 
    default:
       return 0;
