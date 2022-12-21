@@ -64,7 +64,7 @@ FEM::FEM(Mesh* _mesh)
    SolveSLAE_LOS(A, q, b);
    std::ofstream out("Result.txt");
 
-#ifdef DEBUG
+#ifdef DEBUG2
    check_test();
 #endif // DEBUG
    Output(out);
@@ -103,27 +103,40 @@ void FEM::Output(std::ofstream& out)
    }
 }
 
+void FEM::check_test()
+{
+   real sum = 0.;
+   real sumq = 0.;
+   for (int i = 0; i < q.size(); i++)
+   {  
+      sum += abs(q[i] - bound1func(mesh->knots[i], mesh->bounds1[0].n_mat));
+      sumq += abs(bound1func(mesh->knots[i], mesh->bounds1[0].n_mat));
+   }
+
+   std::cout << "Abs error: " << sum / sumq << "\nRelative error: " << sum;
+}
+
 void FEM::AddFirstBounds()
 {
    for (auto& cond : mesh->bounds1)
    {
       for (int i = 0; i < 2; i++)
       {
-         A->di[cond.knots_num[i]] = 1.;
-         for (int j = A->ig[cond.knots_num[i]]; j < A->ig[cond.knots_num[i] + 1]; j++)
+         A->di[cond.e.knots_num[i]] = 1.;
+         for (int j = A->ig[cond.e.knots_num[i]]; j < A->ig[cond.e.knots_num[i] + 1]; j++)
             A->l[j] = 0.;
          for (int ii = 0; ii < A->dim; ii++)                // идем по столбцам
             for (int j = A->ig[ii]; j < A->ig[ii + 1]; j++)   // идем элементам в столбце
-               if (A->jg[j] == cond.knots_num[i])          // в нужной строке элемент?
+               if (A->jg[j] == cond.e.knots_num[i])          // в нужной строке элемент?
                   A->u[j] = 0.;
 #ifdef DEBUG2
-         b[cond.knots_num[i]] = bound1func(mesh->knots[cond.knots_num[i]], cond.n_test);
+         b[cond.e.knots_num[i]] = bound1func(mesh->knots[cond.e.knots_num[i]], cond.n_test);
 #elif
-         b[cond.knots_num[i]] = cond.value1;
+         b[cond.e.knots_num[i]] = cond.value1;
 #endif // DEBUG2
 
 
-         MatSymmetrisation(A, b, cond.knots_num[i]);
+         MatSymmetrisation(A, b, cond.e.knots_num[i]);
       }
    }
 }
@@ -132,17 +145,17 @@ void FEM::AddSecondBounds()
 {
    for (auto& bound : mesh->bounds2)
    {  
-      real h = mesh->length(bound.knots[0], bound.knots[1]);
+      real h = mesh->length(bound.e.knots[0], bound.e.knots[1]);
       real M[2][2] = {{2,1},
                       {1,2}};
 
 #ifdef DEBUG2
 
       for (int i = 0; i < 2; i++)
-         b[bound.knots_num[i]] += bound2func(bound.knots[i], bound.n_test) * (localM[i][0] + localM[i][1]) / h;
+         b[bound.e.knots_num[i]] += bound2func(bound.e.knots[i], (int)round(bound.value1)) * (M[i][0] + M[i][1]) * h / 6;
 #elif
       for (int i = 0; i < 4; i++)
-         b[bound.knots_num[i]] += bound.value1 * (localM[i][0] + localM[i][1]) / h;
+         b[bound.e.knots_num[i]] += bound.value1 * (localM[i][0] + localM[i][1]) / h;
 
 #endif // DEBUG2
 

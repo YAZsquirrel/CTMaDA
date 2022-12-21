@@ -247,6 +247,7 @@ void Mesh::MakeMesh()
    SetElemParameters();
    SetBoundConds();
    RemoveNullKnots();
+   FindEdges();
    XY.clear();
    XY_full.clear();
 
@@ -282,12 +283,23 @@ bool Mesh::isInTriangle(knot& k1, knot& k2, knot& k3, knot& p)
    return (pk12 < 1e-12 && pk23 < 1e-12 && pk31 < 1e-12) || (pk12 >= 1e-12 && pk23 >= 1e-12 && pk31 >= 1e-12);
 }
 
+int Mesh::GetEdgeNumByKnots(knot& k1, knot& k2)
+{
+   int edge_num = -1;
+   for (int i : k1.edges_num)
+      for (int j : k2.edges_num)
+         if (i == j)
+            edge_num = i;
+
+   return edge_num;
+}
+
 void Mesh::output()
 {
    std::ofstream of1("knots.txt");
    of1 << knots.size() << '\n';
    for (size_t i = 0; i < knots.size(); i++)
-      of1 << knots[i].x << " " << knots[i].y << " " << knots[i].z << '\n';
+      of1 << knots[i].x << " " << knots[i].y << '\n';
    of1.close();
 
    std::ofstream of2("elements.txt");
@@ -304,20 +316,26 @@ void Mesh::output()
    std::ofstream of3("bounds1.txt");
    of3 << bounds1.size() << '\n';
    for (auto& b : bounds1)
-      of3 << b.knots_num[0] << " " << b.knots_num[1] << " " << b.value1 << '\n';
+      of3 << b.e.knots_num[0] << " " << b.e.knots_num[1] << " " << b.value1 << '\n';
    of3.close();
 
    std::ofstream of4("bounds2.txt");
    of4 << bounds2.size() << '\n';
    for (auto& b : bounds2)
-      of4 << b.knots_num[0] << " " << b.knots_num[1] << " " << b.value1 << '\n';
+      of4 << b.e.knots_num[0] << " " << b.e.knots_num[1] << " " << b.value1 << '\n';
    of4.close();
 
    std::ofstream of5("bounds3.txt");
    of5 << bounds3.size() << '\n';
    for (auto& b : bounds3)
-      of5 << b.knots_num[0] << " " << b.knots_num[1] << " " << b.value1 << " " << b.value2 << '\n';
+      of5 << b.e.knots_num[0] << " " << b.e.knots_num[1] << " " << b.value1 << " " << b.value2 << '\n';
    of5.close();
+
+   std::ofstream of6("edges.txt");
+   of6 << edges.size() << '\n';
+   for (auto& e : edges)
+      of6 << e.knots_num[0] << " " << e.knots_num[1] << '\n';
+   of6.close();
 
 }
 
@@ -338,9 +356,10 @@ void Mesh::SetBoundConds()
 
          for (size_t i = be.p[0]; i < be.p[1] && !onEdge; i++)
          {
+            // axis <0 = to X [1, 0] (vertical), 1 = to Y [0, 1] (horizontal)> 
             int p1 = be.axis == 1 ? IX[i]     : IY[i], 
                 p2 = be.axis == 1 ? IX[i + 1] : IY[i + 1],
-                q = be.axis == 1 ? IX[be.q] : IY[be.q];
+                q = be.axis == 0 ? IX[be.q] : IY[be.q];
                 
             if (be.axis == 1) // y
             {
@@ -387,10 +406,10 @@ void Mesh::SetBoundConds()
          if (onEdge)
          {
             bound b;
-            b.knots_num[0] = kn[0];
-            b.knots_num[1] = kn[1];
-            b.knots[0] = knots[kn[0]];
-            b.knots[1] = knots[kn[1]];
+            b.e.knots_num[0] = kn[0];
+            b.e.knots_num[1] = kn[1];
+            b.e.knots[0] = knots[kn[0]];
+            b.e.knots[1] = knots[kn[1]];
 
             b.value1 = be.v1;
             b.value2 = be.v2;
@@ -461,17 +480,14 @@ void Mesh::SetElemParameters()
       }
    }
 
-   std::vector<int> toRemove;
-   for (size_t i = 0; i < elems.size(); i++)
-      if (elems[i].n_mat == -1)
-         toRemove.push_back(i);
+   std::vector<element2D> temp;
+   for (auto& e : elems)
+      if (e.n_mat != -1)
+         temp.push_back(e);
 
-   for (size_t j = 0; j < toRemove.size(); j++)
-   {
-      elems.erase(elems.begin() + toRemove[j]);
-      for (size_t jr = j; jr < toRemove.size(); jr++)
-         toRemove[jr]--;
-   }
+   elems.clear();
+   for (auto& e : temp)
+      elems.push_back(e);
 
 }
 
@@ -531,64 +547,108 @@ void Mesh::RemoveNullKnots()
 
    for (auto& b : bounds1)
       for (size_t k = 0; k < 2; k++)
-         if (b.knots_num[k] >= knots.size())
+         if (b.e.knots_num[k] >= knots.size())
          {
             for (size_t i = 0; i < knots.size(); i++)
-               if (knots[i] == b.knots[k])
+               if (knots[i] == b.e.knots[k])
                {
-                  b.knots_num[k] = i;
+                  b.e.knots_num[k] = i;
                   break;
                }
          }
-         else if (knots[b.knots_num[k]] != b.knots[k])
+         else if (knots[b.e.knots_num[k]] != b.e.knots[k])
          {
             for (size_t i = 0; i < knots.size(); i++)
-               if (knots[i] == b.knots[k])
+               if (knots[i] == b.e.knots[k])
                {
-                  b.knots_num[k] = i;
+                  b.e.knots_num[k] = i;
                   break;
                }
          }
 
    for (auto& b : bounds2)
       for (size_t k = 0; k < 2; k++)
-         if (b.knots_num[k] >= knots.size())
+         if (b.e.knots_num[k] >= knots.size())
          {
             for (size_t i = 0; i < knots.size(); i++)
-               if (knots[i] == b.knots[k])
+               if (knots[i] == b.e.knots[k])
                {
-                  b.knots_num[k] = i;
+                  b.e.knots_num[k] = i;
                   break;
                }
          }
-         else if (knots[b.knots_num[k]] != b.knots[k])
+         else if (knots[b.e.knots_num[k]] != b.e.knots[k])
          {
             for (size_t i = 0; i < knots.size(); i++)
-               if (knots[i] == b.knots[k])
+               if (knots[i] == b.e.knots[k])
                {
-                  b.knots_num[k] = i;
+                  b.e.knots_num[k] = i;
                   break;
                }
          }
 
    for (auto& b : bounds3)
       for (size_t k = 0; k < 2; k++)
-         if (b.knots_num[k] >= knots.size())
+         if (b.e.knots_num[k] >= knots.size())
          {
             for (size_t i = 0; i < knots.size(); i++)
-               if (knots[i] == b.knots[k])
+               if (knots[i] == b.e.knots[k])
                {
-                  b.knots_num[k] = i;
+                  b.e.knots_num[k] = i;
                   break;
                }
          }
-         else if (knots[b.knots_num[k]] != b.knots[k])
+         else if (knots[b.e.knots_num[k]] != b.e.knots[k])
          {
             for (size_t i = 0; i < knots.size(); i++)
-               if (knots[i] == b.knots[k])
+               if (knots[i] == b.e.knots[k])
                {
-                  b.knots_num[k] = i;
+                  b.e.knots_num[k] = i;
                   break;
                }
          }
+}
+
+void Mesh::FindEdges()
+{
+   int e_n[4][2] = {{0, 1}, 
+                    {1, 3}, 
+                    {2, 3}, 
+                    {0, 2}};
+   for (int ie = 0; ie < elems.size(); ie++)
+   {
+      auto& e = elems[ie];
+      for (size_t i = 0; i < 4; i++)
+      {
+         bool found = false;                                                                                                                                                                                                          
+
+         int f = edges.size() - 1;
+         for (; f > 0 && !found; f--)
+         {
+            found = (edges[f].knots_num[0] == e.knots_num[e_n[i][0]] && 
+                     edges[f].knots_num[1] == e.knots_num[e_n[i][1]]) ||
+
+                    (edges[f].knots_num[0] == e.knots_num[e_n[i][1]] &&
+                     edges[f].knots_num[1] == e.knots_num[e_n[i][0]]);
+         }
+         if (found) 
+         {
+            e.edge_nums[i] = f;
+            edges[f].elems_num.push_back(ie);
+            continue;
+         }
+         edge _e;
+         _e.knots_num[0] = e.knots_num[e_n[i][0]];
+         _e.knots_num[1] = e.knots_num[e_n[i][1]];
+         _e.knots[0] = knots[_e.knots_num[0]];
+         _e.knots[1] = knots[_e.knots_num[1]];
+         _e.elems_num.push_back(ie);
+         edges.push_back(_e);
+      }
+   }
+
+   for (size_t i = 0; i < edges.size(); i++)
+      for (size_t kn = 0; kn < 2; kn++)
+         knots[edges[i].knots_num[kn]].edges_num.push_back(i);
+
 }

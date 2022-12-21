@@ -6,13 +6,10 @@ real FEM::f(knot& k, element2D& e)
 {
    switch (e.n_test)
    {
-   case 0: return k.x;
+   case 0: return k.y * k.x;
 
-   case 1: return -6 * k.x + k.x * k.x * k.x;	// check M
-   case 2: return 2 * sin(k.x);	// check G + M
-   case 3: return k.y;
-   case 4: return 51;
 
+   default:
       return 0;
    }
 }
@@ -21,12 +18,7 @@ real FEM::bound1func(knot& k, int n_test)
 {
    switch (n_test)
    {
-   case 0: return k.x;  // r
-
-   case 1: return k.x * k.x * k.x;  // r
-   case 2: return sin(k.x);	// r
-   case 3: return k.y;  // z
-   case 4: return 51;   // 51
+   case 0: return k.y * k.x;
 
    default:
       return 0;
@@ -37,7 +29,11 @@ real FEM::bound2func(knot& k, int n_test)
 {
    switch (n_test)
    {
-   case 5: return k.y;
+
+   case 10: return 1; // dy
+   case 11: return -1; // -dy
+   case 20: return 1; // dx
+   case 21: return -1; // -dx
 
    default:
       return 0;

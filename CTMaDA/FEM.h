@@ -13,7 +13,7 @@ using namespace maths;
 class FEM
 {
 private:
-   int num_of_knots, num_of_FE, un;
+   size_t num_of_knots, num_of_FE, un;
 
    //real localM2d[4][4];
    real localM[4][4]; // 8*8
@@ -65,8 +65,8 @@ private:
    std::function<real(real, real, int, int, int[4])> Mij;
 
 public:
-   int GetKnotsNum() { return num_of_knots; }
-   int GetHexasNum() { return num_of_FE; }
+   size_t GetKnotsNum() { return num_of_knots; }
+   size_t GetHexasNum() { return num_of_FE; }
 
    std::vector<real>& GetKnots() { return q; };
    FEM(Mesh* _mesh);

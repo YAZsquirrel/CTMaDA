@@ -11,6 +11,7 @@ struct knot
    knot(real _x, real _y) : x(_x), y(_y), z(0) {}
    knot() : x(0.0), y(0.0), z(0.0) {}
    real x, y, z;
+   std::vector<int> edges_num;
    knot& operator=(const knot& k) {
       if (this == &k) return *this;
       x = k.x;
@@ -50,15 +51,27 @@ struct knot
    }
 };
 
-struct bound {
-   int knots_num[2];
+struct edge {
+   int knots_num[2]{};
+   std::vector<int> elems_num;
    knot knots[2];
-   int n_mat = -1;
-   int n_test = -1;
-   real value1;      // ug, th, ub
-   real value2;      // beta
+
+   edge& operator=(const edge& elem) {
+      if (this == &elem) return *this;
+
+      for (int i = 0; i < 2; i++)
+         knots_num[i] = elem.knots_num[i];
+      return *this;
+   }
 };
 
+struct bound {
+   edge e;
+   int n_mat = -1;
+   int n_test = -1;
+   real value1 = 0;      // ug, th, ub
+   real value2 = 0;      // beta
+};
 struct element2D {
    real lam = 0., gam = 0.;
    int n_test = 0;
@@ -66,6 +79,7 @@ struct element2D {
    int n_mat = -1;
    int knots_num[4]{};
    knot knots[4];
+   int edge_nums[4]{};
 
    bool containsKnot(int n)
    {
@@ -102,19 +116,6 @@ struct element2D {
    element2D() : lam(0), gam(0), n_test(0) {}
 };
 
-struct edge {
-   int knots_num[2];
-   knot knots[2];
-
-   edge& operator=(const edge& elem) {
-      if (this == &elem) return *this;
-
-      for (int i = 0; i < 2; i++)
-         knots_num[i] = elem.knots_num[i];
-      return *this;
-   }
-};
-
 class Mesh
 {
 public:
@@ -123,16 +124,20 @@ public:
    std::vector<bound> bounds1;
    std::vector<bound> bounds2;
    std::vector<bound> bounds3;
+   std::vector<edge> edges;
    void MakeMesh();
    knot& Cross(knot& k1, knot& k2);
    real length(knot& k1, knot& k2);
    bool onSegment(knot& p, knot& k1, knot& k2);
    bool isInTriangle(knot& k1, knot& k2, knot& k3, knot& p);
+   int GetEdgeNumByKnots(knot& k1, knot& k2);
+
 
 private:
    void SetBoundConds();
    void SetElemParameters();
    void RemoveNullKnots();
+   void FindEdges();
 
    void output();
    struct material

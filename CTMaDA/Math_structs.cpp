@@ -5,7 +5,7 @@
 
 namespace maths
 {
-   Matrix* MakeSparseFormat(int localsize, int size, Mesh* mesh)
+   Matrix* MakeSparseFormat(int localsize, size_t size, Mesh* mesh)
    {
       const int N = localsize;
       // set connection table
@@ -22,7 +22,7 @@ namespace maths
       M->ig.resize(size + 1, 0);
 
       for (size_t i = 0; i < size; i++)
-         M->ig[i + 1] = M->ig[i] + map[i].size();
+         M->ig[i + 1] = M->ig[i] + (int)map[i].size();
       M->jg.resize(M->ig[size], 0);
       for (size_t i = 0; i < map.size(); i++)
       {
