@@ -5,7 +5,9 @@ FEM::FEM(Mesh* _mesh)
 {
     mesh = _mesh;
     num_of_knots = mesh->knots.size();
-    num_of_FE = mesh->elems.size();
+    num_of_FEs = mesh->elems.size();
+    num_of_edges = mesh->edges.size();
+
     this->A = MakeSparseFormat(4, num_of_knots, mesh);
     q.resize(num_of_knots, 0.);
     b.resize(num_of_knots, 0.);
@@ -29,19 +31,19 @@ FEM::FEM(Mesh* _mesh)
              J2D[ip][jp] = prime_by_var(ip, jp, knot_num, ksi, etta);  
 
        // J^-1
+       real det = det_J();
        {
-          real det = det_J();
           reversed_J[0][0] = J2D[1][1] / det;
           reversed_J[1][1] = J2D[0][0] / det;
           reversed_J[1][0] = -J2D[1][0] / det;
           reversed_J[0][1] = -J2D[0][1] / det;
        }
 
-       // grad(phi(ksi, etta, theta))
+       // grad(calc_vphi(ksi, etta, theta))
        calc_grad(1, i, ksi, etta);
        calc_grad(2, j, ksi, etta);
 
-       // J^-1 * grad(phi)
+       // J^-1 * grad(calc_vphi)
        for (int ip = 0; ip < 2; ip++)
           for (int jp = 0; jp < 2; jp++)
           {
@@ -53,7 +55,7 @@ FEM::FEM(Mesh* _mesh)
        real res = 0;
        for (int ip = 0; ip < 2; ip++)
           res += Jgrad_i[ip] * Jgrad_j[ip];
-       return res * abs(det_J());
+       return res * abs(det);
     };
 
  }
@@ -67,25 +69,13 @@ FEM::FEM(Mesh* _mesh)
 #ifdef DEBUG2
    check_test();
 #endif // DEBUG
+
    Output(out);
    out.close();
 }
 
 void FEM::Output(std::ofstream& out)
 {
-   //out.scientific;
-   //out.precision(15);
-   //std::cout.scientific;
-   //std::cout.precision(15);
-   out.setf(std::ios::right);
-   out << "| x" << std::fixed;
-   out.width(15);
-   out << "| y";
-   out.width(15);
-   out << "| q";
-   out.width(15);
-   out << "|\n";
-   //std::cout << title;
    out << std::setprecision(7);
 
    for (int i = 0; i < num_of_knots; i++)
@@ -122,21 +112,17 @@ void FEM::AddFirstBounds()
    {
       for (int i = 0; i < 2; i++)
       {
-         A->di[cond.e.knots_num[i]] = 1.;
-         for (int j = A->ig[cond.e.knots_num[i]]; j < A->ig[cond.e.knots_num[i] + 1]; j++)
+         A->di[cond.knots_num[i]] = 1.;
+         for (int j = A->ig[cond.knots_num[i]]; j < A->ig[cond.knots_num[i] + 1]; j++)
             A->l[j] = 0.;
          for (int ii = 0; ii < A->dim; ii++)                // идем по столбцам
             for (int j = A->ig[ii]; j < A->ig[ii + 1]; j++)   // идем элементам в столбце
-               if (A->jg[j] == cond.e.knots_num[i])          // в нужной строке элемент?
+               if (A->jg[j] == cond.knots_num[i])          // в нужной строке элемент?
                   A->u[j] = 0.;
-#ifdef DEBUG2
-         b[cond.e.knots_num[i]] = bound1func(mesh->knots[cond.e.knots_num[i]], cond.n_test);
-#elif
-         b[cond.e.knots_num[i]] = cond.value1;
-#endif // DEBUG2
 
+        b[cond.knots_num[i]] = bound1func(mesh->knots[cond.knots_num[i]], cond.n_test);
 
-         MatSymmetrisation(A, b, cond.e.knots_num[i]);
+         MatSymmetrisation(A, b, cond.knots_num[i]);
       }
    }
 }
@@ -145,19 +131,12 @@ void FEM::AddSecondBounds()
 {
    for (auto& bound : mesh->bounds2)
    {  
-      real h = mesh->length(bound.e.knots[0], bound.e.knots[1]);
+      real h = mesh->length(bound.knots[0], bound.knots[1]);
       real M[2][2] = {{2,1},
                       {1,2}};
 
-#ifdef DEBUG2
-
       for (int i = 0; i < 2; i++)
-         b[bound.e.knots_num[i]] += bound2func(bound.e.knots[i], (int)round(bound.value1)) * (M[i][0] + M[i][1]) * h / 6;
-#elif
-      for (int i = 0; i < 4; i++)
-         b[bound.e.knots_num[i]] += bound.value1 * (localM[i][0] + localM[i][1]) / h;
-
-#endif // DEBUG2
+         b[bound.knots_num[i]] += bound2func(bound.knots[i], (int)round(bound.value1)) * (M[i][0] + M[i][1]) * h / 6;
 
    }
 }
@@ -165,7 +144,7 @@ void FEM::AddSecondBounds()
 void FEM::CreateSLAE()
 {
    element2D hexa;
-   for (int i = 0; i < num_of_FE; i++)
+   for (int i = 0; i < num_of_FEs; i++)
    {
       hexa = mesh->elems[i];
       CreateG(hexa);
@@ -207,7 +186,7 @@ void FEM::Createb(element2D& hexa)
 
    for (int i = 0; i < 4; i++)
       for (int j = 0; j < 4; j++)
-         localb[i] += localM[i][j] * f_[j];
+         localb[i] += localM[i][j] * f_[j] / hexa.gam;
 
    for (int i = 0; i < 4; i++)
       b[hexa.knots_num[i]] += localb[i];

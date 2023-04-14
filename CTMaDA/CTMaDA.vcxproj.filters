@@ -41,6 +41,9 @@
     <ClCompile Include="FEMdebug.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="VectorFEM.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="GridDescription.txt">

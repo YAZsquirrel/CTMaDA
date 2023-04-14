@@ -40,6 +40,41 @@ namespace maths
 
    }
 
+   Matrix* MakeSparseFormat_withEdges(int localsize, size_t size, Mesh* mesh)
+   {
+      const int N = localsize;
+      // set connection table
+      std::vector<std::set<int>> map;
+      map.resize(size);
+      for (auto& Elem : mesh->elems)
+         for (int i = 0; i < N; i++)
+            for (int j = 0; j < N; j++)
+               if (Elem.edge_nums[i] > Elem.edge_nums[j])
+                  map[Elem.edge_nums[i]].insert(Elem.edge_nums[j]);
+
+      Matrix* M = new Matrix;
+      M->dim = size;
+      M->ig.resize(size + 1, 0);
+
+      for (size_t i = 0; i < size; i++)
+         M->ig[i + 1] = M->ig[i] + (int)map[i].size();
+      M->jg.resize(M->ig[size], 0);
+      for (size_t i = 0; i < map.size(); i++)
+      {
+         std::vector<int> jind;
+         jind.reserve(map[i].size());
+         std::copy(map[i].begin(), map[i].end(), std::back_inserter(jind));
+         for (int j = 0; j < jind.size(); j++)
+            M->jg[M->ig[i] + j] = jind[j];
+      }
+
+      M->l.resize(M->ig[size], 0.);
+      M->u.resize(M->ig[size], 0.);
+      M->di.resize(size, 0.);
+      return M;
+
+   }
+
 
    void AddElement(Matrix* M, int i, int j, real elem)
    {

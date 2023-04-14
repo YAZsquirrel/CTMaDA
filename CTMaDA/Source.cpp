@@ -3,7 +3,7 @@ int main()
 {
 	Mesh* grid = new Mesh();
 	grid->MakeMesh();
-	FEM *fem = new FEM(grid);
+	VectorFEM* fem = new VectorFEM(grid);
 	fem->SolveElliptic();
 	return 0;
 }

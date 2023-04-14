@@ -65,17 +65,19 @@ struct edge {
    }
 };
 
-struct bound {
-   edge e;
+struct bound : edge{
+   knot n;
+   int edge_num;
    int n_mat = -1;
    int n_test = -1;
    real value1 = 0;      // ug, th, ub
    real value2 = 0;      // beta
 };
+
 struct element2D {
    real lam = 0., gam = 0.;
    int n_test = 0;
-   const int local_knots_num = 4;
+   const static int local_knots_num = 4;
    int n_mat = -1;
    int knots_num[4]{};
    knot knots[4];
@@ -104,6 +106,8 @@ struct element2D {
       n_mat = elem.n_mat;
       for (int i = 0; i < local_knots_num; i++)
          knots_num[i] = elem.knots_num[i];
+      for (int i = 0; i < 4; i++)
+         edge_nums[i] = elem.edge_nums[i];
       return *this;
    }
 
@@ -128,10 +132,10 @@ public:
    void MakeMesh();
    knot& Cross(knot& k1, knot& k2);
    real length(knot& k1, knot& k2);
+   real length(edge& e);
    bool onSegment(knot& p, knot& k1, knot& k2);
    bool isInTriangle(knot& k1, knot& k2, knot& k3, knot& p);
    int GetEdgeNumByKnots(knot& k1, knot& k2);
-
 
 private:
    void SetBoundConds();

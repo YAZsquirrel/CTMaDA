@@ -16,8 +16,8 @@ namespace maths {
    };
 
 
-
    Matrix* MakeSparseFormat(int localsize, size_t size, Mesh* mesh);
+   Matrix* MakeSparseFormat_withEdges(int localsize, size_t size, Mesh* mesh);
 
    void copy(std::vector<real>& to, std::vector<real>& from);
    void copy(std::vector<int>& to, std::vector<int>& from);
