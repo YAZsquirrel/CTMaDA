@@ -63,6 +63,8 @@ struct edge {
          knots_num[i] = elem.knots_num[i];
       return *this;
    }
+
+   
 };
 
 struct bound : edge{

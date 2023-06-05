@@ -39,11 +39,11 @@ FEM::FEM(Mesh* _mesh)
           reversed_J[0][1] = -J2D[0][1] / det;
        }
 
-       // grad(calc_vphi(ksi, etta, theta))
+       // grad(phi(ksi, etta, theta))
        calc_grad(1, i, ksi, etta);
        calc_grad(2, j, ksi, etta);
 
-       // J^-1 * grad(calc_vphi)
+       // J^-1 * grad(phi)
        for (int ip = 0; ip < 2; ip++)
           for (int jp = 0; jp < 2; jp++)
           {

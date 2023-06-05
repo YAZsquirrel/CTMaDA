@@ -11,6 +11,7 @@
 #include "Math_structs.h"
 
 using namespace maths;
+using integr_f = std::function<real(real, real, int, int, int[4])>;
 
 class FEM
 {
@@ -86,14 +87,15 @@ class VectorFEM
    size_t num_of_knots, num_of_FEs, num_of_edges, un;
 
    //real localM2d[4][4];
-   real localC[4][4]; // 8*8
-   real localG[4][4];
-   real localA[4][4];
-   real rvrs_J[2][2];
+   real localC[4][4]{}; // 8*8
+   real localG[4][4]{};
+   real localA[4][4]{};
+   real localb[4]{};
+   real rJ[2][2]{};
 
-   real J2D[2][2];
+   real J2D[2][2]{};
 
-   inline real det_J();
+   real constexpr det_J();
    void calc_J(int edge_num[4], real ksi, real etta);
    void calc_vphi(int index, real ksi, real etta, real vphi[2]);
    void get_global_xy(real ksi, real etta, real xy[2], element2D& elem);
@@ -102,7 +104,7 @@ class VectorFEM
 
 #ifdef DEBUG2
    void calc_f(edge& k, int n_test, real F[2]);
-   real bound1func(bound& k, int n_mat);
+   real bound1func(edge& k, int n_mat);
    real bound2func(bound& k, int n_mat);
 #endif // DEBUG
 
@@ -119,12 +121,12 @@ class VectorFEM
    std::vector<real> q;
    Mesh* mesh;
 
-   real Integrate(const std::function<real(real, real, int, int, int[4])> f, int i, int j, int knot_num[4]);
+   real Integrate(const integr_f f, int i, int j, int knot_num[4]);
 
    //real Integrate2D(const std::function<real(real, real, int, int, int[4])> calc_f, int i, int j, int knot_num[4]);
 
-   std::function<real(real, real, int, int, int[4])> dij;
-   std::function<real(real, real, int, int, int[4])> Mij;
+   integr_f dij;
+   integr_f Mij;
 
 public:
    size_t GetKnotsNum() { return num_of_knots; }
@@ -135,6 +137,7 @@ public:
    VectorFEM(Mesh* _mesh);
    void SolveElliptic();
    void Output(int point_per_FE_sqred);
+   void CheckOnErrors();
 
 
 

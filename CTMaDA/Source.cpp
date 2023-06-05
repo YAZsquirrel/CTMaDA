@@ -5,5 +5,6 @@ int main()
 	grid->MakeMesh();
 	VectorFEM* fem = new VectorFEM(grid);
 	fem->SolveElliptic();
+	fem->CheckOnErrors();
 	return 0;
 }
