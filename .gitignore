@@ -362,3 +362,11 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /CTMaDA/Result_vectors.txt
+/CTMaDA/bounds1.txt
+/CTMaDA/bounds2.txt
+/CTMaDA/edges.txt
+/CTMaDA/elements.txt
+/CTMaDA/Errors.txt
+/CTMaDA/knots.txt
+/CTMaDA/matrix.txt
+/CTMaDA/Q.txt
