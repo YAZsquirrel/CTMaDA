@@ -11,20 +11,14 @@ VectorFEM::VectorFEM(Mesh* _mesh)
 	num_of_edges = mesh->edges.size();
 
 	this->A = MakeSparseFormat_withEdges(4, num_of_edges, mesh);
-	//A = new Matrix();
-	//A->dense.resize(num_of_edges);
-	//for (auto& Ai : A->dense)
-	//{
-	//	Ai.resize(num_of_edges, 0);
-	//}
 	A->dim = num_of_edges;
 	
 	q.resize(num_of_edges, 0.);
 	b.resize(num_of_edges, 0.);
 
-	Mij = [this](real ksi, real etta, int i, int j, int knot_num[4])
+	Mij = [this](real ksi, real etta, int i, int j, element2D& elem)
 	{
-		calc_J(knot_num, ksi, etta);
+		calc_J(elem.knots_num, ksi, etta);
 		// J^-1
 		real det = det_J();
 		{
@@ -52,10 +46,47 @@ VectorFEM::VectorFEM(Mesh* _mesh)
 		return res;
 	};
 
-	dij = [this](real ksi, real etta, int i, int j, int knot_num[4])
+	dij = [this](real ksi, real etta, int i, int j, element2D& elem)
 	{
-		calc_J(knot_num, ksi, etta);
+		calc_J(elem.knots_num, ksi, etta);
 		return 1. / abs(det_J());
+	};
+
+	fi = [this](real ksi, real etta, int i, int j, element2D& elem)
+	{
+		calc_J(elem.knots_num, ksi, etta);
+
+		// J^-1
+		real det = det_J();
+		{
+			rJ[0][0] = J2D[1][1] / det;
+			rJ[1][1] = J2D[0][0] / det;
+			rJ[1][0] = -J2D[1][0] / det;
+			rJ[0][1] = -J2D[0][1] / det;
+		}
+		real xy[2]{};
+
+		real F[2]{};
+		get_global_xy(ksi, etta, xy, elem);
+		calc_f_in_point(xy[0], xy[1], elem.n_test, F);
+
+		real pi[2] = { 0, 0 }, pj[2] = { 0, 0 };
+		calc_vphi(i, ksi, etta, pi);
+		calc_vphi(j, ksi, etta, pj);
+
+		real rJpi[2] =
+		{
+			rJ[0][0] * pi[0] + rJ[0][1] * pi[1],
+			rJ[1][0] * pi[0] + rJ[1][1] * pi[1]
+		},
+			rJpj[2] =
+		{
+			F[0] * (rJ[0][0] * pj[0] + rJ[0][1] * pj[1]),
+			F[1] * (rJ[1][0] * pj[0] + rJ[1][1] * pj[1])
+		};
+		real res = (rJpi[0] * rJpj[0] + rJpi[1] * rJpj[1]) * abs(det);
+
+		return res;
 	};
 }
 
@@ -121,7 +152,6 @@ void VectorFEM::Output(int point_per_FE_sqred)
 
 				out << xy[0] << ' ' << xy[1] << ' ' << sumq[0] << ' ' << sumq[1] << '\n';
 			}
-
 		// edges
 		for (int e = 0; e < 4; e++)
 		{
@@ -131,8 +161,8 @@ void VectorFEM::Output(int point_per_FE_sqred)
 			for (int k = 1; k < point_per_FE_sqred - 1; k++)
 			{
 				real ksi, etta;
-				real xy[2] = {0, 0};
-				real sumq[2] = {0, 0};
+				real xy[2] = { 0, 0 };
+				real sumq[2] = { 0, 0 };
 				switch (e)
 				{
 				case 0: ksi = -1;
@@ -162,14 +192,16 @@ void VectorFEM::Output(int point_per_FE_sqred)
 			visited_knots.insert(elem.knots_num[k]);
 
 			real ksi = k % 2 ? 1 : -1, etta = k / 2 ? 1 : -1;
-			real xy[2] = {0, 0};
-			real sumq[2] = {0, 0};
+			real xy[2] = { 0, 0 };
+			real sumq[2] = { 0, 0 };
 
 			get_func_by_local_coords(elem, ksi, etta, sumq, xy);
 
 			out << xy[0] << ' ' << xy[1] << ' ' << sumq[0] << ' ' << sumq[1] << '\n';
 		}
 	}
+
+
 
 	out.close();
 
@@ -179,8 +211,6 @@ void VectorFEM::Output(int point_per_FE_sqred)
 		out << mesh->knots[i].x << ' ' << mesh->knots[i].y << '\n';
 
 	out.close();
-
-	WriteMatrix(A);
 	out.flush();
 }
 
@@ -191,7 +221,15 @@ void VectorFEM::CheckOnErrors()
 
 	for (int i = 0; i < GetEdgesNum(); i++)
 	{
-		real u = bound1func(mesh->edges[i], mesh->elems[mesh->edges[i].elems_num[0]].n_test);
+		bound b = {mesh->edges[i]};
+
+		knot &k1 = b.knots[0],
+				&k2 = b.knots[1];
+
+		real l = mesh->length(b);
+
+		b.n = { (k2.y - k1.y) / l, -(k2.x - k1.x) / l };
+		real u = bound1func(b, mesh->elems[mesh->edges[i].elems_num[0]].n_test);
 
 		real error = abs(q[i] - u);
 		if ( error > 1e-14)
@@ -216,8 +254,8 @@ void VectorFEM::get_func_by_local_coords(element2D& elem, real ksi, real etta, r
 	{
 		real vphi[2] = {0, 0};
 		calc_vphi(p, ksi, etta, vphi);
-		sumq[0] += q[elem.edge_nums[p]] * vphi[0]; //(rJ[0][0] * vphi[0] + rJ[0][1] * vphi[1]);
-		sumq[1] += q[elem.edge_nums[p]] * vphi[1]; //(rJ[1][0] * vphi[0] + rJ[1][1] * vphi[1]);
+		sumq[0] += q[elem.edge_nums[p]] * (rJ[0][0] * vphi[0] + rJ[0][1] * vphi[1]);
+		sumq[1] += q[elem.edge_nums[p]] * (rJ[1][0] * vphi[0] + rJ[1][1] * vphi[1]);
 	}
 
 	get_global_xy(ksi, etta, xy, elem);
@@ -232,24 +270,28 @@ void VectorFEM::AddFirstBounds()
 		switch (A->format)
 		{
 		case SparseRowColumn:
+		{
 			A->di[e_num] = 1.;
 			for (int j = A->ig[e_num]; j < A->ig[e_num + 1]; j++)
 				A->l[j] = 0.;
-			
+
 			for (int ii = 0; ii < A->dim; ii++) // идем по столбцам
 				for (int j = A->ig[ii]; j < A->ig[ii + 1]; j++) // идем элементам в столбце
 					if (A->jg[j] == e_num) // в нужной строке элемент?
 						A->u[j] = 0.;
 			break;
+		}
 
 		case Dense:
-			for (int i =0; i < A->dim;i++)
+			{
+			for (int i = 0; i < A->dim; i++)
 			{
 				A->dense[e_num][i] = 0.;
-				if (i == e_num) 
+				if (i == e_num)
 					A->dense[e_num][i] = 1.;
 			}
 			break;
+			}
 		}
 		b[e_num] = bound1func(bound, int(round(bound.value1))/*bound.n_test*/);
 
@@ -261,11 +303,17 @@ void VectorFEM::AddSecondBounds()
 {
 	for (auto& bound : mesh->bounds2)
 	{
+		knot& k1 = mesh->knots[bound.knots_num[0]],
+			 & k2 = mesh->knots[bound.knots_num[1]];
 		real l = mesh->length(bound);
+		real t[2] = { (k2.x - k1.x) / l, (k2.y - k1.y) / l };
+
 		real xl = bound.knots[1].x - bound.knots[0].x,
 		     yl = bound.knots[1].y - bound.knots[0].y;
+
 		int be_num = bound.edge_num;
-		b[be_num] += bound2func(bound, int(round(bound.value1))) * 2. / l * (-bound.n.y * xl + bound.n.x * yl);
+		b[be_num] += bound2func(bound, int(bound.value1)) * (xl * t[0] + yl * t[1]) * 2. / l;//(-bound.n.y * xl + bound.n.x * yl);
+		//b[be_num] += bound2func(bound, int(bound.value1)) * (-bound.n.y * xl + bound.n.x * yl) * 2. / l;
 	}
 }
 
@@ -282,56 +330,47 @@ void VectorFEM::CreateSLAE()
 	}
 
 	AddSecondBounds();
-	WriteMatrix(A);
+	WriteMatrix(A, b);
 	AddFirstBounds();
-	WriteMatrix(A);
+	WriteMatrix(A, b);
 }
 
 void VectorFEM::AddToA(element2D& hexa)
 {
 	for (int i = 0; i < 4; i++)
 		for (int j = 0; j < 4; j++)
-			AddElement(A, hexa.edge_nums[i], hexa.edge_nums[j], localA[i][j] = hexa.lam * localG[i][j] + hexa.gam * localC[i][j]);
+			AddElement(A, hexa.edge_nums[i], hexa.edge_nums[j], 
+							localA[i][j] = (hexa.lam * localG[i][j] + hexa.gam * localC[i][j])//);
+							 * mesh->length(mesh->edges[hexa.edge_nums[i]]) * mesh->length(mesh->edges[hexa.edge_nums[j]]) / 4.);
 }
 
 void VectorFEM::CreateM(element2D& hexa)
 {
 	for (int i = 0; i < 4; i++)
 		for (int j = 0; j < 4; j++)
-			localC[i][j] = Integrate(Mij, i, j, hexa.knots_num);
+			localC[i][j] = Integrate2D(Mij, i, j, hexa);
 }
 
 void VectorFEM::CreateG(element2D& hexa)
 {
 	for (int i = 0; i < 4; i++)
 		for (int j = 0; j < 4; j++)
-			localG[i][j] = Integrate(dij, i, j, hexa.knots_num) * .25 * (i == j || i + j == 3 ? 1. : -1.);
+			localG[i][j] = Integrate2D(dij, i, j, hexa) * .25 * (i == j || i + j == 3 ? 1. : -1.);
 }
 
 void VectorFEM::Createb(element2D& hexa)
 {
-	for (int i = 0; i < 4; i++)
-		localb[i] = 0;
-	real f_[4]{};
-	real t[2]{};
-	real F[2]{};
+	for (size_t i = 0; i < 4; i++)
+		localb[i] = 0.;
 
 	for (int i = 0; i < 4; i++)
 	{
 		edge& e = mesh->edges[hexa.edge_nums[i]];
-		knot& k1 = mesh->knots[e.knots_num[0]],
-			  &k2 = mesh->knots[e.knots_num[1]];
-		real l = mesh->length(e);
-
-		t[0] = (k2.x - k1.x) / l;
-		t[1] = (k2.y - k1.y) / l;
-		calc_f(e, hexa.n_test, F);
-		f_[i] = F[0] * t[0] + F[1] * t[1];
-	}
-
-	for (int i = 0; i < 4; i++)
+		real sum = 0;
 		for (int j = 0; j < 4; j++)
-			localb[i] += localC[i][j] * f_[j];
+			sum += Integrate2D(fi, i, j, hexa) * mesh->length(mesh->edges[hexa.edge_nums[i]]) * mesh->length(mesh->edges[hexa.edge_nums[j]]) / 4.;
+		localb[i] = sum;
+	}
 
 	for (int i = 0; i < 4; i++)
 		b[hexa.edge_nums[i]] += localb[i];
@@ -339,15 +378,15 @@ void VectorFEM::Createb(element2D& hexa)
 
 void VectorFEM::calc_vphi(int index, real ksi, real etta, real vphi[2])
 {
+	real side = !(index % 2) ? -1 : 1;
+	real axis = side * (index / 2 ? etta : ksi);
 	switch (index)
 	{
-	case 0: vphi[1] = (1. - ksi) / 2.;
+	case 0: 
+	case 1: vphi[1] = (1. + axis) / 2.; // (0, (k+-1)/2)
 		break;
-	case 1: vphi[1] = (1. + ksi) / 2.;
-		break;
-	case 2: vphi[0] = (1. - etta) / 2.;
-		break;
-	case 3: vphi[0] = (1. + etta) / 2.;
+	case 2:
+	case 3: vphi[0] = (1. + axis) / 2.; // ((n+-1)/2, 0)
 		break;
 	}
 }
@@ -355,15 +394,21 @@ void VectorFEM::calc_vphi(int index, real ksi, real etta, real vphi[2])
 void VectorFEM::get_global_xy(real ksi, real etta, real xy[2], element2D& elem)
 {
 	real x[4] = {
-		     mesh->knots[elem.knots_num[0]].x, mesh->knots[elem.knots_num[1]].x, mesh->knots[elem.knots_num[2]].x,
+		     mesh->knots[elem.knots_num[0]].x, 
+			  mesh->knots[elem.knots_num[1]].x, 
+			  mesh->knots[elem.knots_num[2]].x,
 		     mesh->knots[elem.knots_num[3]].x
 	     },
 	     y[4] = {
-		     mesh->knots[elem.knots_num[0]].y, mesh->knots[elem.knots_num[1]].y, mesh->knots[elem.knots_num[2]].y,
+		     mesh->knots[elem.knots_num[0]].y, 
+			  mesh->knots[elem.knots_num[1]].y, 
+			  mesh->knots[elem.knots_num[2]].y,
 		     mesh->knots[elem.knots_num[3]].y
 	     },
 	     p[4] = {
-		     phi(0, ksi, etta, elem.knots_num), phi(1, ksi, etta, elem.knots_num), phi(2, ksi, etta, elem.knots_num),
+		     phi(0, ksi, etta, elem.knots_num),
+			  phi(1, ksi, etta, elem.knots_num), 
+			  phi(2, ksi, etta, elem.knots_num),
 		     phi(3, ksi, etta, elem.knots_num)
 	     };
 	for (int i = 0; i < 4; i++)
@@ -401,8 +446,7 @@ void VectorFEM::calc_J(int knots_num[4], real ksi, real etta)
 	J2D[1][1] = m1 * (v2[1] - v0[1]) + m3 * (v3[1] - v1[1]);
 }
 
-
-real VectorFEM::Integrate(const integr_f f, int i, int j, int knot_nums[4])
+real VectorFEM::Integrate2D(const integr_f f, int i, int j, element2D& elem)
 {
 	const int nKnot = 3; //5; // Knots num
 
@@ -419,6 +463,7 @@ real VectorFEM::Integrate(const integr_f f, int i, int j, int knot_nums[4])
 	real result = 0.;
 	for (int ix = 0; ix < nKnot; ix++)
 		for (int iy = 0; iy < nKnot; iy++)
-			result += qj[ix] * qj[iy] * (f(xj[ix], xj[iy], i, j, knot_nums));
-	return result;
+			result += qj[ix] * qj[iy] * f(xj[ix], xj[iy], i, j, elem);
+	return result; 
 }
+

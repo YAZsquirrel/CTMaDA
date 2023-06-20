@@ -11,7 +11,7 @@
 #include "Math_structs.h"
 
 using namespace maths;
-using integr_f = std::function<real(real, real, int, int, int[4])>;
+using integr_f = std::function<real(real, real, int, int, element2D&)>;
 
 class FEM
 {
@@ -104,7 +104,8 @@ class VectorFEM
 
 #ifdef DEBUG2
    void calc_f(edge& k, int n_test, real F[2]);
-   real bound1func(edge& k, int n_mat);
+   void calc_f_in_point(real x, real y, int n_test, real F[2]);
+   real bound1func(bound& k, int n_mat);
    real bound2func(bound& k, int n_mat);
 #endif // DEBUG
 
@@ -121,12 +122,13 @@ class VectorFEM
    std::vector<real> q;
    Mesh* mesh;
 
-   real Integrate(const integr_f f, int i, int j, int knot_num[4]);
+   real Integrate2D(const integr_f f, int i, int j, element2D& elem);
 
    //real Integrate2D(const std::function<real(real, real, int, int, int[4])> calc_f, int i, int j, int knot_num[4]);
 
    integr_f dij;
    integr_f Mij;
+   integr_f fi;
 
 public:
    size_t GetKnotsNum() { return num_of_knots; }

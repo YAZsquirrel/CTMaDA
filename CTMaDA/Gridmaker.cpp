@@ -170,7 +170,7 @@ void Mesh::MakeMesh()
 
    for (size_t ixg = 0; ixg < nX; ixg++)
    {
-      for (size_t iyg = 1; iyg < nY; iyg++)
+      for (size_t iyg = 1; iyg < nY - 1; iyg++)
       {
          real x[2] = { XY[(iyg - 1) * nX + ixg].x,
                        XY[iyg * nX + ixg].x };

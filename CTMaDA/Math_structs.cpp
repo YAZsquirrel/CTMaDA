@@ -339,7 +339,7 @@ namespace maths
       SLAEResidualOutput(q, M, b);
    }
 
-   void WriteMatrix(Matrix* M)
+   void WriteMatrix(Matrix* M, std::vector<real> &b)
    {
       double** mat = new double* [M->dim] {};
       for (int i = 0; i < M->dim; i++)
@@ -385,6 +385,15 @@ namespace maths
          }
          out << "\n";
       }
+      out << "\n\n";
+      for (int i = 0; i < M->dim; i++)
+      {
+         out.setf(std::ios::left);
+         out.width(15);
+         out << b[i];
+      }
+
+      out.close();
    }
 
    void MatSymmetrisation(Matrix* M, std::vector<real>& b, int i)
